@@ -3,6 +3,7 @@ package inject
 import "testing"
 import "errors"
 import "github.com/jrivets/gorivets"
+import "github.com/jrivets/log4g"
 
 var initC []interface{} = make([]interface{}, 0)
 var deinit []interface{} = make([]interface{}, 0)
@@ -15,9 +16,9 @@ type c1 struct {
 }
 
 type c2 struct {
-	C1Ref *c1 `inject:""`
-	err   bool
-	panic bool
+	C1Ref         *c1 `inject:""`
+	panic         bool
+	postConstruct bool
 }
 
 type c3 struct {
@@ -45,6 +46,13 @@ func (c *c1) DiShutdown() {
 	deinit = append(deinit, c)
 }
 
+func (c *c2) DiPostConstruct() {
+	c.postConstruct = true
+	if c.panic {
+		panic("c2 panics")
+	}
+}
+
 func (*c3) DiPhase() int {
 	return -1
 }
@@ -65,7 +73,7 @@ func (c *c3) DiShutdown() {
 }
 
 func TestInjectStraight(t *testing.T) {
-	inj := NewInjector()
+	inj := NewInjector(log4g.GetLogger("injector"))
 
 	c1Inst := &c1{}
 	c2Inst := &c2{}
@@ -97,6 +105,10 @@ func TestInjectStraight(t *testing.T) {
 		t.Fatal("0 deinits should happen")
 	}
 
+	if !c2Inst.postConstruct {
+		t.Fatal("c2.DiPostConstruct() is not called")
+	}
+
 	inj.Shutdown()
 
 	if len(deinit) != 2 || deinit[0] != c1Inst || deinit[1] != c3Inst {
@@ -105,7 +117,7 @@ func TestInjectStraight(t *testing.T) {
 }
 
 func TestInjectNew(t *testing.T) {
-	inj := NewInjector()
+	inj := NewInjector(log4g.GetLogger("injector"))
 
 	c1Inst := &c1{}
 	c2Inst := &c2{}
@@ -145,7 +157,7 @@ func TestInjectNew(t *testing.T) {
 }
 
 func TestRollbackInit(t *testing.T) {
-	inj := NewInjector()
+	inj := NewInjector(log4g.GetLogger("injector"))
 
 	c1Inst := &c1{err: true}
 	c2Inst := &c2{}
@@ -173,7 +185,7 @@ func TestRollbackInit(t *testing.T) {
 }
 
 func TestRollbackInit2(t *testing.T) {
-	inj := NewInjector()
+	inj := NewInjector(log4g.GetLogger("injector"))
 
 	c1Inst := &c1{phase: -2}
 	c2Inst := &c2{}
@@ -197,5 +209,37 @@ func TestRollbackInit2(t *testing.T) {
 
 	if len(deinit) != 1 || deinit[0] != c1Inst {
 		t.Fatal("1 de-inits should happen")
+	}
+}
+
+func TestPostConstructPanics(t *testing.T) {
+	inj := NewInjector(log4g.GetLogger("injector"))
+
+	c1Inst := &c1{phase: -2}
+	c2Inst := &c2{panic: true}
+	c3Inst := &c3{}
+
+	inj.Register(&Component{Component: c1Inst}, &Component{Component: c2Inst, Name: "c2"}, &Component{Component: c3Inst})
+
+	initC = make([]interface{}, 0)
+	deinit = make([]interface{}, 0)
+	err := gorivets.CheckPanic(func() {
+		inj.Construct()
+	})
+
+	if err == nil {
+		t.Fatal("Panic is expected")
+	}
+
+	if len(initC) != 0 {
+		t.Fatal("0 inits should happen!")
+	}
+
+	if len(deinit) != 0 {
+		t.Fatal("0 de-inits should happen")
+	}
+
+	if !c2Inst.postConstruct {
+		t.Fatal("c2.DiPostConstruct() is not called")
 	}
 }

@@ -26,6 +26,7 @@ import "strconv"
 // of the initialization order.
 type Injector struct {
 	logger      log4g.Logger
+	fbLogger    log4g.Logger
 	fbInjector  *inject.Graph
 	lcComps     *gorivets.SortedSlice
 	constructed bool
@@ -45,10 +46,24 @@ type LifeCycler interface {
 	DiShutdown()
 }
 
+// A component can implement the interface to be notified by the injector
+// after all dependencies are injected
+type PostConstructor interface {
+	DiPostConstruct()
+}
+
 func (c *Component) lifeCycler() LifeCycler {
 	lc, ok := c.Component.(LifeCycler)
 	if ok {
 		return lc
+	}
+	return nil
+}
+
+func (c *Component) postConstructor() PostConstructor {
+	pc, ok := c.Component.(PostConstructor)
+	if ok {
+		return pc
 	}
 	return nil
 }
@@ -78,15 +93,28 @@ var lfCompare = func(a, b interface{}) int {
 	return gorivets.CompareInt(p1, p2)
 }
 
-func NewInjector() *Injector {
+func NewInjector(logger log4g.Logger) *Injector {
 	fbInjector := &inject.Graph{}
-	injector := &Injector{logger: log4g.GetLogger("console.injector"), fbInjector: fbInjector}
+	injector := &Injector{logger: logger, fbLogger: log4g.GetLogger(logger.GetName() + ".fb"), fbInjector: fbInjector}
 	fbInjector.Logger = injector
 	return injector
 }
 
 func (i *Injector) Debugf(format string, v ...interface{}) {
-	i.logger.Logf(log4g.DEBUG, format, v)
+	i.fbLogger.Logf(log4g.DEBUG, format, v)
+}
+
+func (i *Injector) RegisterOne(ifs interface{}, name string) {
+	obj := &inject.Object{Value: ifs, Name: name}
+	i.fbInjector.Provide(obj)
+}
+
+func (i *Injector) RegisterMany(comps ...interface{}) {
+	var objects []*Component = make([]*Component, len(comps))
+	for idx, c := range comps {
+		objects[idx] = &Component{Component: c}
+	}
+	i.Register(objects...)
 }
 
 func (i *Injector) Register(comps ...*Component) {
@@ -104,7 +132,8 @@ func (i *Injector) Construct() {
 		panic("The dependency Inector already initialized. Injector.Construct() can be called once!")
 	}
 	i.constructed = true
-	if err := i.fbInjector.Populate(); !gorivets.IsNil(err) {
+	if err := i.fbInjector.Populate(); err != nil {
+		i.logger.Error("Got the error while initialization ", err)
 		panic(err)
 	}
 
@@ -125,6 +154,7 @@ func (i *Injector) Construct() {
 }
 
 func (i *Injector) Shutdown() {
+	i.logger.Info("Shutdown.")
 	i.shutdownLcs()
 }
 
@@ -136,8 +166,8 @@ func (i *Injector) newLcComps() {
 	i.lcComps, _ = gorivets.NewSortedSliceByComp(lfCompare, size)
 }
 
-// Scans all FB objects and make components from them.
-// Build sorted list of life cyclers.
+// it scans all FB objects and makes components from them.
+// Also it builds sorted list of life cyclers and call for post constructors
 func (i *Injector) afterPopulation() {
 	i.newLcComps()
 	cmpMap := make(map[interface{}]*Component)
@@ -152,6 +182,12 @@ func (i *Injector) afterPopulation() {
 		}
 		comp := &Component{Component: o.Value, Name: o.Name}
 		cmpMap[o.Value] = comp
+
+		pc := comp.postConstructor()
+		if pc != nil {
+			i.logger.Debug("Post construct: ", comp)
+			pc.DiPostConstruct()
+		}
 
 		lfCycler := comp.lifeCycler()
 		if lfCycler != nil {
@@ -178,6 +214,10 @@ func (i *Injector) initLcs() error {
 }
 
 func (i *Injector) shutdownLcs() {
+	if i.lcComps == nil {
+		i.logger.Info("Life cyclers shutdowner: they were not initialized.")
+		return
+	}
 	lcComps := i.lcComps.Copy()
 	i.logger.Info("Shutting down life-cyclers (", i.lcComps.Len(), " will be shut down)")
 	i.lcComps = nil
