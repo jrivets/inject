@@ -57,6 +57,10 @@ func (*c3) DiPhase() int {
 	return -1
 }
 
+func (*c3) String() string {
+	return "c3"
+}
+
 func (c *c3) DiInit() error {
 	if c.err {
 		return errors.New("c3 error")

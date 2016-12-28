@@ -6,6 +6,7 @@ import "github.com/jrivets/gorivets"
 import "errors"
 import "bytes"
 import "strconv"
+import "fmt"
 
 // Use the Injector to provide dependency injection (DI) design pattern. The
 // Injector can construct and populate Components (a structs which fields
@@ -83,6 +84,8 @@ func (c *Component) String() string {
 	} else {
 		buffer.WriteString("no")
 	}
+	buffer.WriteString(", Component: ")
+	buffer.WriteString(fmt.Sprintf("%v", c.Component))
 	buffer.WriteString("}")
 	return buffer.String()
 }
