@@ -3,7 +3,6 @@ package inject
 import "testing"
 import "errors"
 import "github.com/jrivets/gorivets"
-import "github.com/jrivets/log4g"
 
 var initC []interface{} = make([]interface{}, 0)
 var deinit []interface{} = make([]interface{}, 0)
@@ -77,7 +76,7 @@ func (c *c3) DiShutdown() {
 }
 
 func TestInjectStraight(t *testing.T) {
-	inj := NewInjector(log4g.GetLogger("injector"))
+	inj := NewInjector(gorivets.NewStubLogger("inj"), gorivets.NewStubLogger("inj.fb"))
 
 	c1Inst := &c1{}
 	c2Inst := &c2{}
@@ -121,7 +120,7 @@ func TestInjectStraight(t *testing.T) {
 }
 
 func TestInjectNew(t *testing.T) {
-	inj := NewInjector(log4g.GetLogger("injector"))
+	inj := NewInjector(gorivets.NewStubLogger("inj"), gorivets.NewStubLogger("inj.fb"))
 
 	c1Inst := &c1{}
 	c2Inst := &c2{}
@@ -161,7 +160,7 @@ func TestInjectNew(t *testing.T) {
 }
 
 func TestRollbackInit(t *testing.T) {
-	inj := NewInjector(log4g.GetLogger("injector"))
+	inj := NewInjector(gorivets.NewStubLogger("inj"), gorivets.NewStubLogger("inj.fb"))
 
 	c1Inst := &c1{err: true}
 	c2Inst := &c2{}
@@ -189,7 +188,7 @@ func TestRollbackInit(t *testing.T) {
 }
 
 func TestRollbackInit2(t *testing.T) {
-	inj := NewInjector(log4g.GetLogger("injector"))
+	inj := NewInjector(gorivets.NewStubLogger("inj"), gorivets.NewStubLogger("inj.fb"))
 
 	c1Inst := &c1{phase: -2}
 	c2Inst := &c2{}
@@ -217,7 +216,7 @@ func TestRollbackInit2(t *testing.T) {
 }
 
 func TestPostConstructPanics(t *testing.T) {
-	inj := NewInjector(log4g.GetLogger("injector"))
+	inj := NewInjector(gorivets.NewStubLogger("inj"), gorivets.NewStubLogger("inj.fb"))
 
 	c1Inst := &c1{phase: -2}
 	c2Inst := &c2{panic: true}

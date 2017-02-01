@@ -1,7 +1,6 @@
 package inject
 
 import "github.com/facebookgo/inject"
-import "github.com/jrivets/log4g"
 import "github.com/jrivets/gorivets"
 import "errors"
 import "bytes"
@@ -26,8 +25,8 @@ import "fmt"
 // that implement the interface in a specific order and de-initialize them in reverse
 // of the initialization order.
 type Injector struct {
-	logger      log4g.Logger
-	fbLogger    log4g.Logger
+	logger      gorivets.Logger
+	fbLogger    gorivets.Logger
 	fbInjector  *inject.Graph
 	lcComps     *gorivets.SortedSlice
 	constructed bool
@@ -96,15 +95,15 @@ var lfCompare = func(a, b interface{}) int {
 	return gorivets.CompareInt(p1, p2)
 }
 
-func NewInjector(logger log4g.Logger) *Injector {
+func NewInjector(logger gorivets.Logger, loggerFb gorivets.Logger) *Injector {
 	fbInjector := &inject.Graph{}
-	injector := &Injector{logger: logger, fbLogger: log4g.GetLogger(logger.GetName() + ".fb"), fbInjector: fbInjector}
+	injector := &Injector{logger: logger, fbLogger: loggerFb, fbInjector: fbInjector}
 	fbInjector.Logger = injector
 	return injector
 }
 
 func (i *Injector) Debugf(format string, v ...interface{}) {
-	i.fbLogger.Logf(log4g.DEBUG, format, v)
+	i.fbLogger.Debug(fmt.Sprintf(format, v...))
 }
 
 func (i *Injector) RegisterOne(ifs interface{}, name string) {
