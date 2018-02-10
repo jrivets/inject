@@ -135,7 +135,7 @@ func (i *Injector) Construct() {
 	}
 	i.constructed = true
 	if err := i.fbInjector.Populate(); err != nil {
-		i.logger.Error("Got the error while initialization ", err)
+		i.logger.Error("Got the error while initialization: ", err)
 		panic(err)
 	}
 
